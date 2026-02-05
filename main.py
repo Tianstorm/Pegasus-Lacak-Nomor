@@ -32,6 +32,46 @@ from utils.health_check import health_checker
 from utils.input_validator import validator
 from utils.backup_manager import backup_manager
 
+# Import new advanced features
+try:
+    from managers.user_manager import UserManager
+    from models.user import Permission
+    USER_SYSTEM_AVAILABLE = True
+except ImportError as e:
+    USER_SYSTEM_AVAILABLE = False
+
+try:
+    from analytics.dashboard import AnalyticsDashboard
+    ANALYTICS_AVAILABLE = True
+except ImportError:
+    ANALYTICS_AVAILABLE = False
+
+try:
+    from ml.anomaly_detector import AnomalyDetector
+    ML_AVAILABLE = True
+except ImportError:
+    ML_AVAILABLE = False
+
+try:
+    from geo.geospatial_analyzer import GeospatialAnalyzer
+    GEO_AVAILABLE = True
+except ImportError:
+    GEO_AVAILABLE = False
+
+try:
+    from reporting.advanced_exporter import AdvancedExporter, generate_professional_report
+    REPORTING_AVAILABLE = True
+except ImportError:
+    REPORTING_AVAILABLE = False
+
+try:
+    from automation.scheduler import TaskScheduler, get_scheduler, start_scheduler, stop_scheduler
+    from automation.scheduler import SCHEDULE_AVAILABLE
+    AUTOMATION_AVAILABLE = True
+except ImportError:
+    AUTOMATION_AVAILABLE = False
+    SCHEDULE_AVAILABLE = False
+
 # Initialize colorama
 init()
 
@@ -41,6 +81,12 @@ audit_logger = audit_logger
 health_checker = health_checker
 validator = validator
 backup_manager = backup_manager
+
+# Initialize new managers
+user_manager = UserManager() if USER_SYSTEM_AVAILABLE else None
+dashboard = AnalyticsDashboard() if ANALYTICS_AVAILABLE else None
+anomaly_detector = AnomalyDetector() if ML_AVAILABLE else None
+geo_analyzer = GeospatialAnalyzer() if GEO_AVAILABLE else None
 
 # Global variables
 quick_mode = QUICK_SEARCH_MODE
@@ -724,6 +770,382 @@ def backup_restore_menu():
             print_colored("\n[!] Pilihan tidak valid!", "ERROR")
             time.sleep(1)
 
+
+# ==================== ADVANCED FEATURES ====================
+
+def login_screen():
+    """User login screen for multi-user system."""
+    if not USER_SYSTEM_AVAILABLE:
+        print_colored("\n[!] Multi-user system not available.", "WARNING")
+        time.sleep(2)
+        return True
+    
+    print_colored("\n╔═══════════════════════════════════════╗", "INFO")
+    print_colored("║         PEGASUS - USER LOGIN          ║", "SUCCESS")
+    print_colored("╚═══════════════════════════════════════╝", "INFO")
+    
+    username = input(f"\n{Fore.YELLOW}Username: {Style.RESET_ALL}")
+    
+    # Use getpass for password if available
+    try:
+        import getpass
+        password = getpass.getpass(f"{Fore.YELLOW}Password: {Style.RESET_ALL}")
+    except:
+        password = input(f"{Fore.YELLOW}Password: {Style.RESET_ALL}")
+    
+    if user_manager.authenticate(username, password):
+        print_colored(f"\n[✓] Welcome, {username}!", "SUCCESS")
+        print_colored(f"[i] Role: {user_manager.current_user.role.value}", "INFO")
+        return True
+    else:
+        print_colored("\n[!] Invalid credentials", "ERROR")
+        time.sleep(2)
+        return False
+
+
+def user_management_menu():
+    """User management menu (admin only)."""
+    if not USER_SYSTEM_AVAILABLE:
+        print_colored("\n[!] Multi-user system not available.", "WARNING")
+        time.sleep(2)
+        return
+    
+    if not user_manager.current_user or not user_manager.current_user.has_permission(Permission.MANAGE_USERS):
+        print_colored("\n[!] You don't have permission to manage users.", "ERROR")
+        time.sleep(2)
+        return
+    
+    while True:
+        print_colored(f"\n{'='*70}", "INFO")
+        print_colored("USER MANAGEMENT (Admin Only)", "SUCCESS")
+        print_colored(f"{'='*70}", "INFO")
+        print("1. List Users")
+        print("2. Create User")
+        print("3. Delete User")
+        print("4. Change Password")
+        print("5. Back")
+        
+        choice = input(f"\n{Fore.YELLOW}Pilih (1-5): {Style.RESET_ALL}")
+        
+        if choice == '1':
+            try:
+                users = user_manager.list_users()
+                print_colored(f"\n{'='*70}", "INFO")
+                print_colored("USERS LIST", "SUCCESS")
+                print_colored(f"{'='*70}", "INFO")
+                print(f"{'ID':<5} {'Username':<20} {'Role':<15} {'Active':<10}")
+                print_colored("-" * 70, "INFO")
+                for user in users:
+                    print(f"{user['id']:<5} {user['username']:<20} {user['role']:<15} {'Yes' if user['is_active'] else 'No':<10}")
+            except Exception as e:
+                print_colored(f"\n[!] Error: {str(e)}", "ERROR")
+        
+        elif choice == '2':
+            try:
+                username = input(f"{Fore.YELLOW}New username: {Style.RESET_ALL}")
+                password = input(f"{Fore.YELLOW}Password: {Style.RESET_ALL}")
+                print("Roles: admin, operator, viewer, auditor")
+                role = input(f"{Fore.YELLOW}Role: {Style.RESET_ALL}")
+                
+                user = user_manager.create_user(username, password, role)
+                print_colored(f"\n[✓] User '{username}' created successfully!", "SUCCESS")
+            except Exception as e:
+                print_colored(f"\n[!] Error: {str(e)}", "ERROR")
+        
+        elif choice == '3':
+            try:
+                username = input(f"{Fore.YELLOW}Username to delete: {Style.RESET_ALL}")
+                confirm = input(f"{Fore.YELLOW}Are you sure? (y/n): {Style.RESET_ALL}")
+                if confirm.lower() == 'y':
+                    user_manager.delete_user(username)
+                    print_colored(f"\n[✓] User '{username}' deleted!", "SUCCESS")
+            except Exception as e:
+                print_colored(f"\n[!] Error: {str(e)}", "ERROR")
+        
+        elif choice == '4':
+            try:
+                username = input(f"{Fore.YELLOW}Username: {Style.RESET_ALL}")
+                new_password = input(f"{Fore.YELLOW}New password: {Style.RESET_ALL}")
+                user_manager.change_password(username, new_password)
+                print_colored(f"\n[✓] Password changed!", "SUCCESS")
+            except Exception as e:
+                print_colored(f"\n[!] Error: {str(e)}", "ERROR")
+        
+        elif choice == '5':
+            break
+        
+        input(f"\n{Fore.YELLOW}[Enter untuk melanjutkan]{Style.RESET_ALL}")
+
+
+def show_analytics_dashboard():
+    """Display real-time analytics dashboard."""
+    if not ANALYTICS_AVAILABLE:
+        print_colored("\n[!] Analytics dashboard not available.", "WARNING")
+        time.sleep(2)
+        return
+    
+    while True:
+        dashboard.display_dashboard()
+        
+        print(f"\n{Fore.YELLOW}[R] Refresh | [W] Weekly Report | [E] Export | [Q] Quit{Style.RESET_ALL}")
+        choice = input("Command: ").lower()
+        
+        if choice == 'r':
+            continue
+        elif choice == 'w':
+            dashboard.generate_weekly_report()
+            input(f"\n{Fore.YELLOW}[Enter untuk melanjutkan]{Style.RESET_ALL}")
+        elif choice == 'e':
+            try:
+                import json
+                stats = dashboard.get_realtime_stats()
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"exports/analytics_{timestamp}.json"
+                os.makedirs("exports", exist_ok=True)
+                with open(filename, 'w') as f:
+                    json.dump(stats, f, indent=2)
+                print_colored(f"\n[✓] Analytics exported to: {filename}", "SUCCESS")
+                time.sleep(2)
+            except Exception as e:
+                print_colored(f"\n[!] Export failed: {str(e)}", "ERROR")
+                time.sleep(2)
+        elif choice == 'q':
+            break
+
+
+def show_anomaly_detection():
+    """Display anomaly detection report."""
+    if not ML_AVAILABLE:
+        print_colored("\n[!] Anomaly detection not available.", "WARNING")
+        time.sleep(2)
+        return
+    
+    print_colored("\n╔════════════════════════════════════════════╗", "INFO")
+    print_colored("║      ANOMALY DETECTION REPORT              ║", "WARNING")
+    print_colored("╚════════════════════════════════════════════╝", "INFO")
+    
+    # Train model if not trained
+    if not anomaly_detector.is_trained:
+        print_colored("\n[*] Training anomaly detection model...", "INFO")
+        trained = anomaly_detector.train()
+        if not trained:
+            print_colored("[!] Not enough data to train model (need 50+ searches)", "WARNING")
+            time.sleep(3)
+            return
+    
+    # Generate report
+    report = anomaly_detector.generate_report()
+    
+    if not report:
+        print_colored("[!] Could not generate report", "ERROR")
+        time.sleep(2)
+        return
+    
+    print(f"\n{Fore.CYAN}RISK LEVEL: {report['risk_level']}{Style.RESET_ALL}")
+    print(f"Anomalies Detected: {report['anomaly_count']}")
+    print(f"High Confidence Anomalies: {report['high_confidence_anomalies']}")
+    
+    patterns = report['patterns']
+    alerts = []
+    
+    if patterns.get('rapid_fire_searches'):
+        alerts.append("⚠ Rapid-fire searches detected (potential abuse)")
+    if patterns.get('unusual_times'):
+        alerts.append("⚠ Unusual search times detected")
+    if patterns.get('repeated_targets'):
+        alerts.append("⚠ Repeated target searches (potential stalking)")
+    if patterns.get('geographic_anomalies'):
+        alerts.append("⚠ Geographic anomalies detected")
+    if patterns.get('high_volume_user'):
+        alerts.append("⚠ High volume usage detected")
+    
+    if alerts:
+        print_colored("\n[!] ALERTS:", "ERROR")
+        for alert in alerts:
+            print_colored(f"  {alert}", "WARNING")
+    else:
+        print_colored("\n[✓] No anomalies detected", "SUCCESS")
+    
+    input(f"\n{Fore.YELLOW}[Enter untuk kembali]{Style.RESET_ALL}")
+
+
+def show_geospatial_analysis():
+    """Display geospatial analysis menu."""
+    if not GEO_AVAILABLE:
+        print_colored("\n[!] Geospatial analysis not available.", "WARNING")
+        time.sleep(2)
+        return
+    
+    search_history = history_manager.get_all_history(100)
+    
+    if not search_history:
+        print_colored("\n[!] No search history available", "WARNING")
+        time.sleep(2)
+        return
+    
+    while True:
+        print_colored(f"\n{'='*70}", "INFO")
+        print_colored("GEOSPATIAL ANALYSIS", "SUCCESS")
+        print_colored(f"{'='*70}", "INFO")
+        print("1. Generate Heatmap")
+        print("2. Generate Cluster Map")
+        print("3. Detect Geographic Clusters")
+        print("4. Calculate Search Radius")
+        print("5. Location Statistics")
+        print("6. Back")
+        
+        choice = input(f"\n{Fore.YELLOW}Pilih (1-6): {Style.RESET_ALL}")
+        
+        if choice == '1':
+            geo_analyzer.create_heatmap_html()
+            input(f"\n{Fore.YELLOW}[Enter untuk melanjutkan]{Style.RESET_ALL}")
+        elif choice == '2':
+            geo_analyzer.create_cluster_map_html()
+            input(f"\n{Fore.YELLOW}[Enter untuk melanjutkan]{Style.RESET_ALL}")
+        elif choice == '3':
+            clusters = geo_analyzer.detect_geographic_clusters()
+            print_colored(f"\n[i] Found {len(clusters)} geographic clusters", "INFO")
+            for i, cluster in enumerate(clusters, 1):
+                cities = set(loc['city'] for loc in cluster)
+                print(f"  Cluster {i}: {len(cluster)} locations ({', '.join(cities)})")
+            input(f"\n{Fore.YELLOW}[Enter untuk melanjutkan]{Style.RESET_ALL}")
+        elif choice == '4':
+            radius = geo_analyzer.calculate_search_radius()
+            print_colored(f"\n[i] Search radius: {radius:.2f} km", "INFO")
+            input(f"\n{Fore.YELLOW}[Enter untuk melanjutkan]{Style.RESET_ALL}")
+        elif choice == '5':
+            stats = geo_analyzer.get_location_statistics()
+            print_colored(f"\n{'='*70}", "INFO")
+            print_colored("LOCATION STATISTICS", "SUCCESS")
+            print_colored(f"{'='*70}", "INFO")
+            print(f"Total Locations: {stats.get('total_locations', 0)}")
+            print(f"Unique Cities: {stats.get('unique_cities', 0)}")
+            print(f"Unique Provinces: {stats.get('unique_provinces', 0)}")
+            print(f"Search Radius: {stats.get('search_radius_km', 0):.2f} km")
+            
+            if stats.get('top_cities'):
+                print(f"\n{Fore.CYAN}Top Cities:{Style.RESET_ALL}")
+                for city, count in list(stats['top_cities'].items())[:5]:
+                    print(f"  {city}: {count}")
+            
+            input(f"\n{Fore.YELLOW}[Enter untuk melanjutkan]{Style.RESET_ALL}")
+        elif choice == '6':
+            break
+
+
+def advanced_reporting_menu():
+    """Advanced reporting menu."""
+    if not REPORTING_AVAILABLE:
+        print_colored("\n[!] Advanced reporting not available.", "WARNING")
+        time.sleep(2)
+        return
+    
+    search_history = history_manager.get_all_history(100)
+    
+    if not search_history:
+        print_colored("\n[!] No search history available", "WARNING")
+        time.sleep(2)
+        return
+    
+    print_colored(f"\n{'='*70}", "INFO")
+    print_colored("ADVANCED REPORTING", "SUCCESS")
+    print_colored(f"{'='*70}", "INFO")
+    print("1. PDF Report")
+    print("2. Excel Report (Advanced)")
+    print("3. HTML Report")
+    print("4. All Formats")
+    print("5. Back")
+    
+    choice = input(f"\n{Fore.YELLOW}Choose format (1-5): {Style.RESET_ALL}")
+    
+    if choice == '1':
+        generate_professional_report(search_history, 'pdf')
+    elif choice == '2':
+        generate_professional_report(search_history, 'excel')
+    elif choice == '3':
+        generate_professional_report(search_history, 'html')
+    elif choice == '4':
+        files = generate_professional_report(search_history, 'all')
+        print_colored(f"\n[✓] Generated {len(files)} reports", "SUCCESS")
+    elif choice == '5':
+        return
+    
+    if choice in ['1', '2', '3', '4']:
+        input(f"\n{Fore.YELLOW}[Enter untuk kembali]{Style.RESET_ALL}")
+
+
+def automation_menu():
+    """Automation and scheduler menu."""
+    if not AUTOMATION_AVAILABLE:
+        print_colored("\n[!] Automation not available.", "WARNING")
+        if not SCHEDULE_AVAILABLE:
+            print_colored("[i] Install schedule library: pip install schedule", "INFO")
+        time.sleep(2)
+        return
+    
+    scheduler = get_scheduler()
+    
+    print_colored(f"\n{'='*70}", "INFO")
+    print_colored("AUTOMATION & SCHEDULER", "SUCCESS")
+    print_colored(f"{'='*70}", "INFO")
+    print(f"Status: {'Running' if scheduler.running else 'Stopped'}")
+    print("\n1. Start Scheduler")
+    print("2. Stop Scheduler")
+    print("3. Run Backup Now")
+    print("4. Run Report Now")
+    print("5. Run Cleanup Now")
+    print("6. Run Health Check Now")
+    print("7. Back")
+    
+    choice = input(f"\n{Fore.YELLOW}Pilih (1-7): {Style.RESET_ALL}")
+    
+    if choice == '1':
+        if not scheduler.running:
+            start_scheduler()
+        else:
+            print_colored("[!] Scheduler is already running", "WARNING")
+    elif choice == '2':
+        if scheduler.running:
+            stop_scheduler()
+        else:
+            print_colored("[!] Scheduler is not running", "WARNING")
+    elif choice == '3':
+        scheduler.run_task_now('backup')
+    elif choice == '4':
+        scheduler.run_task_now('report')
+    elif choice == '5':
+        scheduler.run_task_now('cleanup')
+    elif choice == '6':
+        scheduler.run_task_now('health')
+    
+    if choice in ['1', '2', '3', '4', '5', '6']:
+        time.sleep(2)
+
+
+def start_api_server_menu():
+    """Start the API server."""
+    print_colored(f"\n{'='*70}", "INFO")
+    print_colored("API SERVER", "SUCCESS")
+    print_colored(f"{'='*70}", "INFO")
+    
+    try:
+        from api.server import start_api_server
+        
+        host = input(f"{Fore.YELLOW}Host (default 0.0.0.0): {Style.RESET_ALL}").strip() or "0.0.0.0"
+        port = input(f"{Fore.YELLOW}Port (default 5000): {Style.RESET_ALL}").strip() or "5000"
+        
+        print_colored(f"\n[*] Starting API server on {host}:{port}...", "INFO")
+        print_colored("[*] Press Ctrl+C to stop", "WARNING")
+        
+        try:
+            start_api_server(host=host, port=int(port), debug=False)
+        except KeyboardInterrupt:
+            print_colored("\n[!] API server stopped", "WARNING")
+    except ImportError as e:
+        print_colored(f"\n[!] API server not available: {str(e)}", "ERROR")
+        print_colored("[i] Install Flask: pip install flask flask-cors", "INFO")
+        time.sleep(3)
+
 def show_menu():
     """Display main menu."""
     print_colored(f"\n{'='*70}", "INFO")
@@ -746,6 +1168,16 @@ def show_menu():
     print("15. Info Operator")
     print("16. Cek Kesehatan API")
     print("17. Backup & Restore")
+    print_colored(f"{'='*70}", "INFO")
+    print_colored("ADVANCED FEATURES", "WARNING")
+    print_colored(f"{'='*70}", "INFO")
+    print("18. User Management (Admin)")
+    print("19. Analytics Dashboard")
+    print("20. Anomaly Detection")
+    print("21. Geospatial Analysis")
+    print("22. Advanced Reporting")
+    print("23. Automation & Scheduler")
+    print("24. Start API Server")
     print("0. Keluar")
     print_colored(f"{'='*70}", "INFO")
     
@@ -805,15 +1237,26 @@ def main():
     clear_screen()
     print_banner()
     
+    # Check password first
     if not check_password():
         return
+    
+    # Login screen for multi-user system
+    if USER_SYSTEM_AVAILABLE:
+        if not login_screen():
+            return
     
     while True:
         clear_screen()
         print_banner()
+        
+        # Show current user info if multi-user system
+        if USER_SYSTEM_AVAILABLE and user_manager.current_user:
+            print_colored(f"[i] Logged in as: {user_manager.current_user.username} ({user_manager.current_user.role.value})", "INFO")
+        
         show_menu()
         
-        choice = input(f"\n{Fore.YELLOW}[?] Pilih menu (0-15): {Style.RESET_ALL}")
+        choice = input(f"\n{Fore.YELLOW}[?] Pilih menu (0-24): {Style.RESET_ALL}")
         
         if choice == '1':
             single_search()
@@ -849,6 +1292,20 @@ def main():
             check_api_health()
         elif choice == '17':
             backup_restore_menu()
+        elif choice == '18':
+            user_management_menu()
+        elif choice == '19':
+            show_analytics_dashboard()
+        elif choice == '20':
+            show_anomaly_detection()
+        elif choice == '21':
+            show_geospatial_analysis()
+        elif choice == '22':
+            advanced_reporting_menu()
+        elif choice == '23':
+            automation_menu()
+        elif choice == '24':
+            start_api_server_menu()
         elif choice == '0':
             break
         else:
@@ -856,8 +1313,15 @@ def main():
             time.sleep(1)
             continue
         
-        if choice in ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '14', '15', '16']:
+        # List of choices that need enter to continue
+        enter_options = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', 
+                        '14', '15', '16', '18', '20', '22']
+        if choice in enter_options:
             input(f"\n{Fore.YELLOW}[Enter untuk kembali ke menu]{Style.RESET_ALL}")
+    
+    # Stop scheduler on exit if running
+    if AUTOMATION_AVAILABLE:
+        stop_scheduler()
     
     print_colored("\n[!] Terima kasih telah menggunakan Pegasus Lacak Nomor!", "SUCCESS")
     time.sleep(2)

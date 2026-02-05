@@ -54,6 +54,12 @@ data/local_database.db
 config/api_config.py
 !config/api_config.example.py
 
+# User database (contains sensitive data)
+data/users.db
+
+# HTML exports
+exports/*.html
+
 # OS
 .DS_Store
 Thumbs.db
