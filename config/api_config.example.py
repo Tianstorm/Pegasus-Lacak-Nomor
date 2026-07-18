@@ -7,7 +7,7 @@
 
 # Set to True untuk mengaktifkan Real Tracking dengan API
 # Set to False untuk mode simulasi (default)
-API_ENABLED = False  # Ubah ke True untuk real tracking
+API_ENABLED = true  # Ubah ke True untuk real tracking
 
 # ============================================================================
 # API CREDENTIALS
